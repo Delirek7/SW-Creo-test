@@ -3,5 +3,6 @@
     <Platform Name="x64" />
     <Platform Name="x86" />
   </Configurations>
-  <Project Path="SW-Creo-test.vcxproj" />
+  <Folder Name="/Solution Items/" />
+  <Project Path="SW-Creo-test.vcxproj" Id="4ddeb843-c741-458a-8911-b33420e6be8e" />
 </Solution>
