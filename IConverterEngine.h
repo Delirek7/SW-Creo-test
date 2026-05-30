@@ -19,3 +19,13 @@ public:
     // Optional: We might want a way to clean up or close the document explicitly
     virtual void ClosePart() = 0;
 };
+
+// A simple structure to hold 3D point data
+struct Vector3 {
+    double x, y, z;
+};
+
+// A triangle is made of 3 points
+struct Triangle {
+    Vector3 v1, v2, v3;
+};
