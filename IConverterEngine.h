@@ -29,3 +29,8 @@ struct Vector3 {
 struct Triangle {
     Vector3 v1, v2, v3;
 };
+
+// A simple line segment between two points
+struct LineSegment {
+    Vector3 v1, v2;
+};

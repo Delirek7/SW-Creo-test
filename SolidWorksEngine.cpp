@@ -67,6 +67,8 @@ bool SolidWorksEngine::ConvertToObj(const std::string& outputPath) {
         if (!swPart) return false;
 
         std::vector<Triangle> allTriangles;
+        std::vector<LineSegment> allEdges;
+
         // v VARIANT is a C# "dynamic", and variant_t a wrapper to handle it
         variant_t vBodies = swPart->GetBodies2(-1, VARIANT_FALSE);
         if (vBodies.vt & VT_ARRAY) { // Ensure that vBodies is an array with bitwise AND (&)
@@ -80,6 +82,7 @@ bool SolidWorksEngine::ConvertToObj(const std::string& outputPath) {
                 SafeArrayGetElement(psa, &i, &pUnk); // <- SafeArrayGetElement requests IUnknown pointer (pUnk)
                 IBody2Ptr swBody = pUnk;
                 if (swBody) {
+                    // --- FACES ---
                     variant_t vFaces = swBody->GetFaces();
                     if (vFaces.vt & VT_ARRAY) {
                         SAFEARRAY* psaFaces = vFaces.parray;
@@ -105,7 +108,7 @@ bool SolidWorksEngine::ConvertToObj(const std::string& outputPath) {
                                     SafeArrayGetLBound(vTess.parray, 1, &tLower); // Start of triangle array (starts with 0)
                                     SafeArrayGetUBound(vTess.parray, 1, &tUpper); // End of triangle array
 
-                                    long numFloats = tUpper - tLower + 1; // Total number of triangles
+                                    long numFloats = tUpper - tLower + 1; // Total number of floats (not triangles)
                                     // Each triangle has 3 vertices * 3 coordinates (x,y,z) = 9 floats
                                     for (long k = 0; k < numFloats; k += 9) {
                                         Triangle tri;
@@ -119,6 +122,84 @@ bool SolidWorksEngine::ConvertToObj(const std::string& outputPath) {
                                 }
                             }
                             if (pUnkFace) pUnkFace->Release();
+                        }
+                    }
+
+                    // --- EDGES ---
+                    variant_t vEdges = swBody->GetEdges();
+                    if (vEdges.vt & VT_ARRAY) {
+                        SAFEARRAY* psaEdges = vEdges.parray;
+                        long eLBound, eUBound;
+                        SafeArrayGetLBound(psaEdges, 1, &eLBound);
+                        SafeArrayGetUBound(psaEdges, 1, &eUBound);
+
+                        for (long j = eLBound; j <= eUBound; j++) {
+                            IUnknown* pUnkEdge = nullptr;
+                            SafeArrayGetElement(psaEdges, &j, &pUnkEdge);
+                            IEdgePtr swEdge = pUnkEdge;
+
+                            if (swEdge) {
+                                // IEdge doesn't have GetPolyline, we must get the underlying Curve first
+                                ICurvePtr swCurve = swEdge->GetCurve();
+                                if (swCurve) {
+                                    // Get the physical start and end points of the edge
+                                    double startPt[3] = {0}, endPt[3] = {0};
+                                    VARIANT_BOOL isClosed = VARIANT_FALSE, isPeriodic = VARIANT_FALSE;
+                                    swCurve->GetEndParams(startPt, endPt, &isClosed, &isPeriodic);
+
+                                    // Pack points into SAFEARRAYs for GetTessPts
+                                    SAFEARRAYBOUND bounds = { 3, 0 };
+                                    SAFEARRAY *psaStart = SafeArrayCreate(VT_R8, 1, &bounds);
+                                    SAFEARRAY *psaEnd = SafeArrayCreate(VT_R8, 1, &bounds);
+
+                                    if (psaStart && psaEnd) {
+                                        double *pDataStart = nullptr, *pDataEnd = nullptr;
+                                        SafeArrayAccessData(psaStart, (void**)&pDataStart);
+                                        SafeArrayAccessData(psaEnd, (void**)&pDataEnd);
+
+                                        if (pDataStart && pDataEnd) {
+                                            memcpy(pDataStart, startPt, 3 * sizeof(double));
+                                            memcpy(pDataEnd, endPt, 3 * sizeof(double));
+                                        }
+
+                                        SafeArrayUnaccessData(psaStart);
+                                        SafeArrayUnaccessData(psaEnd);
+
+                                        // Use direct assignment to avoid constructor ambiguity.
+                                        // The variants will now "own" the arrays and clean them up automatically.
+                                        variant_t vStart;
+                                        vStart.vt = VT_ARRAY | VT_R8;
+                                        vStart.parray = psaStart;
+
+                                        variant_t vEnd;
+                                        vEnd.vt = VT_ARRAY | VT_R8;
+                                        vEnd.parray = psaEnd;
+
+                                        // GetTessPts returns a flat array of doubles (x,y,z, x,y,z, ...)
+                                        variant_t vPoly = swCurve->GetTessPts(0.001, 0.001, vStart, vEnd);
+
+                                        if (vPoly.vt == (VT_ARRAY | VT_R8) && vPoly.parray != nullptr) {
+                                            double* pDoubles = nullptr;
+                                            SafeArrayAccessData(vPoly.parray, (void**)&pDoubles);
+                                            long pL, pU;
+                                            SafeArrayGetLBound(vPoly.parray, 1, &pL);
+                                            SafeArrayGetUBound(vPoly.parray, 1, &pU);
+
+                                            long count = pU - pL + 1;
+                                            for (long k = 0; k < count - 3; k += 3) {
+                                                LineSegment edgeSeg;
+                                                edgeSeg.v1 = { pDoubles[k],   pDoubles[k+1], pDoubles[k+2] };
+                                                edgeSeg.v2 = { pDoubles[k+3], pDoubles[k+4], pDoubles[k+5] };
+                                                allEdges.push_back(edgeSeg);
+                                            }
+                                            SafeArrayUnaccessData(vPoly.parray);
+                                        }
+                                    }
+                                    // NO SafeArrayDestroy here! 
+                                    // The variant_t objects (vStart/vEnd) now own the memory and will clean it up automatically.
+                                }
+                            }
+                            if (pUnkEdge) pUnkEdge->Release();
                         }
                     }
                 }
@@ -145,7 +226,15 @@ bool SolidWorksEngine::ConvertToObj(const std::string& outputPath) {
             vertexIndex += 3;
         }
 
-        std::cout << "Successfully exported " << allTriangles.size() << " triangles to " << outputPath << std::endl;
+        // Write Edges as 'l' (line) elements
+        for (const auto& edge : allEdges) {
+            outFile << "v " << edge.v1.x << " " << edge.v1.y << " " << edge.v1.z << std::endl;
+            outFile << "v " << edge.v2.x << " " << edge.v2.y << " " << edge.v2.z << std::endl;
+            outFile << "l " << vertexIndex << " " << vertexIndex + 1 << std::endl;
+            vertexIndex += 2;
+        }
+
+        std::cout << "Successfully exported " << allTriangles.size() << " triangles and " << allEdges.size() << " edges to " << outputPath << std::endl;
         return true;
 
     } catch (_com_error& e) {
