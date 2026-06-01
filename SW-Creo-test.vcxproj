@@ -139,12 +139,20 @@
     </Manifest>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="GeometryExtractor.h" />
     <ClInclude Include="IConverterEngine.h" />
+    <ClInclude Include="ObjExporter.h" />
     <ClInclude Include="SolidWorksEngine.h" />
+    <ClInclude Include="SwApp.h" />
+    <ClInclude Include="SwPart.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="GeometryExtractor.cpp" />
     <ClCompile Include="main.cpp" />
+    <ClCompile Include="ObjExporter.cpp" />
     <ClCompile Include="SolidWorksEngine.cpp" />
+    <ClCompile Include="SwApp.cpp" />
+    <ClCompile Include="SwPart.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
