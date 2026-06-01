@@ -2,6 +2,8 @@
 #include <iostream>
 #include <vector>
 #include <fstream>
+#include <atlbase.h>
+using namespace ATL;
 
 SolidWorksEngine::SolidWorksEngine() {
         // Constructing connection
@@ -16,7 +18,7 @@ SolidWorksEngine::SolidWorksEngine() {
     } catch (_com_error& e) {
         std::wcerr << L"SolidWorks Init Error: " << e.ErrorMessage() << std::endl;
     }               //^L is a flag to use 16-bit Unicode symbols, default is 8-bit
-}                                                                       // ^std::endl is a veri important, so in case
+}                                                                       // ^std::endl is a very important, so in case
                                                                         // of a plugin crash it wont hang without output
 bool SolidWorksEngine::OpenPart(const std::string& filePath) {
     if (!m_swApp) return false;
@@ -78,9 +80,9 @@ bool SolidWorksEngine::ConvertToObj(const std::string& outputPath) {
             SafeArrayGetUBound(psa, 1, &upperBound);
 
             for (long i = lowerBound; i <= upperBound; i++) {
-                IUnknown* pUnk = nullptr;
+                CComPtr<IUnknown> pUnk;
                 SafeArrayGetElement(psa, &i, &pUnk); // <- SafeArrayGetElement requests IUnknown pointer (pUnk)
-                IBody2Ptr swBody = pUnk;
+                IBody2Ptr swBody = pUnk.p;
                 if (swBody) {
                     // --- FACES ---
                     variant_t vFaces = swBody->GetFaces();
@@ -91,9 +93,9 @@ bool SolidWorksEngine::ConvertToObj(const std::string& outputPath) {
                         SafeArrayGetUBound(psaFaces, 1, &fUBound);
 
                         for (long j = fLBound; j <= fUBound; j++) {
-                            IUnknown* pUnkFace = nullptr;
+                            CComPtr<IUnknown> pUnkFace;
                             SafeArrayGetElement(psaFaces, &j, &pUnkFace);
-                            IFace2Ptr swFace = pUnkFace;
+                            IFace2Ptr swFace = pUnkFace.p;
 
                             if (swFace) {
                                 // 4. Get Tessellation (Triangles) for the face
@@ -121,7 +123,6 @@ bool SolidWorksEngine::ConvertToObj(const std::string& outputPath) {
                                     SafeArrayUnaccessData(vTess.parray); // Unlock memory from Direct Access
                                 }
                             }
-                            if (pUnkFace) pUnkFace->Release();
                         }
                     }
 
@@ -134,9 +135,9 @@ bool SolidWorksEngine::ConvertToObj(const std::string& outputPath) {
                         SafeArrayGetUBound(psaEdges, 1, &eUBound);
 
                         for (long j = eLBound; j <= eUBound; j++) {
-                            IUnknown* pUnkEdge = nullptr;
+                            CComPtr<IUnknown> pUnkEdge;
                             SafeArrayGetElement(psaEdges, &j, &pUnkEdge);
-                            IEdgePtr swEdge = pUnkEdge;
+                            IEdgePtr swEdge = pUnkEdge.p;
 
                             if (swEdge) {
                                 // IEdge doesn't have GetPolyline, we must get the underlying Curve first
@@ -197,11 +198,9 @@ bool SolidWorksEngine::ConvertToObj(const std::string& outputPath) {
                                     }
                                 }
                             }
-                            if (pUnkEdge) pUnkEdge->Release();
                         }
                     }
                 }
-                if (pUnk) pUnk->Release();
             }
         }
 

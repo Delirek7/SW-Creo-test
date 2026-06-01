@@ -18,9 +18,17 @@ int main() {
         // 2. Create the engine (This will start SolidWorks)
         SolidWorksEngine engine;
 
-        // 3. Try to open a part (Change this path to a real .SLDPRT on your machine!)
-        std::string testPath = "C:\\Users\\delir\\Downloads\\Non return valve\\COVER.SLDPRT";
+        // 3. Ask for the path manually
+        std::string testPath;
+        std::cout << "Please enter the FULL path to your .SLDPRT file: " << std::endl;
         
+        // We use getline instead of cin >> because paths often have spaces
+        std::getline(std::cin, testPath);
+
+        // Remove quotes if the user copied path as "C:\path"
+        if (!testPath.empty() && testPath.front() == '"') testPath.erase(0, 1);
+        if (!testPath.empty() && testPath.back() == '"') testPath.pop_back();
+
         std::cout << "Opening: " << testPath << "..." << std::endl;
         
         if (engine.OpenPart(testPath)) {
