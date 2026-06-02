@@ -28,7 +28,7 @@ bool SolidWorksEngine::OpenPart(const std::string& filePath) {
 bool SolidWorksEngine::ConvertToObj(const std::string& outputPath) {
     if (!m_activePart) return false;
 
-    // Orchestration with no try-catch!
+    // Orchestration with no try-catch
     ModelData data = GeometryExtractor::Extract(*m_activePart);
     return ObjExporter::Save(data, outputPath);
 }
