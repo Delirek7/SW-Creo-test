@@ -1,16 +1,23 @@
 #include "SwApp.h"
 
-SwApp::SwApp() {
-    // Constructing connection
-    try {                                                           // Is SolidWorks already open?
-        if (FAILED(m_swApp.GetActiveObject(__uuidof(SldWorks)))) {  // __uuidof search for app ID in Win Registry
-            m_swApp.CreateInstance(__uuidof(SldWorks));             // No? Then start a brand new one
-        }   // ^m_swApp is a Smart Pointer that uses COM for Solidwork
+SwApp::SwApp(ISldWorksPtr swApp) : m_swApp(swApp) {}
 
-        if (m_swApp) {
-            m_swApp->PutVisible(VARIANT_TRUE); // Pop-up Solidworks
+std::unique_ptr<SwApp> SwApp::Connect() {
+    ISldWorksPtr swApp;
+
+    // Try to connect
+    if (FAILED(swApp.GetActiveObject(__uuidof(SldWorks)))) {
+        if (FAILED(swApp.CreateInstance(__uuidof(SldWorks)))) {
+            return nullptr; // Failure: Return null instead of throwing
         }
-    } catch (_com_error& e) {
-        std::wcerr << L"SwApp Connection Error: " << e.ErrorMessage() << std::endl;
-    }               //^L is a flag to use 16-bit Unicode symbols, default is 8-bit
+    }
+
+    if (swApp) {
+        swApp->PutVisible(VARIANT_TRUE);
+        // Create the object and wrap it in a unique_ptr
+        // We use 'new' here because the constructor is private
+        return std::unique_ptr<SwApp>(new SwApp(swApp));
+    }
+
+    return nullptr;
 }

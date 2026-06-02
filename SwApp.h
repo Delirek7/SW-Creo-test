@@ -1,25 +1,22 @@
 #pragma once
 #include <windows.h>
 #include <comdef.h>
-#include <iostream>
+#include <memory>
 
-// Import SolidWorks (We need this in every wrapper file that talks to SW)
+// Import SolidWorks
 #import "C:\\Program Files\\SOLIDWORKS Corp\\SOLIDWORKS\\sldworks.tlb" no_namespace, named_guids
 
 class SwApp {
 public:
-    // Constructor: Starts or connects to SolidWorks
-    SwApp();
+    // Factory Method: Returns a smart pointer to a connected app, or nullptr if it fails.
+    static std::unique_ptr<SwApp> Connect();
 
-    // Destructor: Automatically releases the connection
     ~SwApp() = default;
 
-    // Returns the raw SolidWorks pointer (needed by other classes)
     ISldWorksPtr Get() const { return m_swApp; }
 
-    // Helper to check if we are actually connected
-    bool IsValid() const { return m_swApp != nullptr; }
-
 private:
+    // Constructor is PRIVATE so users MUST use the Connect() factory.
+    SwApp(ISldWorksPtr swApp);
     ISldWorksPtr m_swApp;
 };

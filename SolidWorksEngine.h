@@ -1,17 +1,13 @@
 #pragma once
 #include <memory>
 #include <string>
-#include <vector>
 #include "IConverterEngine.h"
 #include "SwApp.h"
 #include "SwPart.h"
-#include "GeometryExtractor.h"
-#include "ObjExporter.h"
 
-// The Orchestrator class
 class SolidWorksEngine : public IConverterEngine {
 public:
-    SolidWorksEngine() = default;
+    SolidWorksEngine();
     virtual ~SolidWorksEngine() = default;
 
     bool OpenPart(const std::string& filePath) override;
@@ -19,7 +15,7 @@ public:
     void ClosePart() override;
 
 private:
-    SwApp m_app;
+    // m_app is now a pointer because it might fail to connect
+    std::unique_ptr<SwApp> m_app;
     std::unique_ptr<SwPart> m_activePart;
-    std::string m_currentPath; // To keep track of the opened path
 };
