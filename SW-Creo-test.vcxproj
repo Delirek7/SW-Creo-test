@@ -142,6 +142,8 @@
     <ClInclude Include="GeometryExtractor.h" />
     <ClInclude Include="IConverterEngine.h" />
     <ClInclude Include="ObjExporter.h" />
+    <ClInclude Include="SafeArrayBuilder.h" />
+    <ClInclude Include="SafeArrayWrapper.h" />
     <ClInclude Include="SolidWorksEngine.h" />
     <ClInclude Include="SwApp.h" />
     <ClInclude Include="SwPart.h" />

@@ -33,6 +33,12 @@
     <ClInclude Include="SwPart.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="SafeArrayWrapper.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="SafeArrayBuilder.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="SolidWorksEngine.cpp">
