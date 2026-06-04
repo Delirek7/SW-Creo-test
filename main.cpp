@@ -1,19 +1,20 @@
 #include "SolidWorksEngine.h"
 #include <iostream>
 #include <string>
-#include <vector>
 
 int main(int argc, char* argv[]) {
     // 1. Initialize COM
     HRESULT hr = CoInitializeEx(NULL, COINIT_APARTMENTTHREADED);
     if (FAILED(hr)) {
-        std::cerr << "Failed to initialize COM" << std::endl;
+        std::cerr << "CRITICAL: COM Initialization failed." << std::endl;
         return 1;
     }
 
     std::cout << "--- SolidWorks Engine Test ---" << std::endl;
 
-    {
+    try {
+        // --- THE VALID PATH ---
+
         SolidWorksEngine engine;
         std::string testPath;
 
@@ -21,7 +22,6 @@ int main(int argc, char* argv[]) {
         // argv[0] is the program name, argv[1] is the first user argument
         if (argc >= 2) {
             testPath = argv[1];
-            std::cout << "Path received via Command Line: " << testPath << std::endl;
         } else {
             // Fallback to manual input if no argument provided
             std::cout << "Please enter the FULL path to your .SLDPRT file: " << std::endl;
@@ -32,31 +32,28 @@ int main(int argc, char* argv[]) {
         if (!testPath.empty() && testPath.front() == '"') testPath.erase(0, 1);
         if (!testPath.empty() && testPath.back() == '"') testPath.pop_back();
 
+        if (testPath.empty()) throw std::runtime_error("No file path provided.");
+
         // 4. Execute the conversion
-        if (!testPath.empty()) {
-            std::cout << "Processing: " << testPath << "..." << std::endl;
-            
-            if (engine.OpenPart(testPath)) {
-                std::cout << "SUCCESS: Part opened!" << std::endl;
+        engine.OpenPart(testPath);
+        std::cout << "SUCCESS: Part opened!" << std::endl;
 
-                // Create an output name based on the input (simple version)
-                std::string outputPath = "converted_model.obj";
+        engine.ConvertToObj("converted_model.obj");
+        std::cout << "SUCCESS: Export finished!" << std::endl;
 
-                if (engine.ConvertToObj(outputPath)) {
-                    std::cout << "SUCCESS: Model exported to " << outputPath << std::endl;
-                }
+        engine.ClosePart();
 
-                engine.ClosePart();
-            } else {
-                std::cout << "FAILURE: Could not open part. Check the path and SolidWorks installation." << std::endl;
-            }
-        }
+    } catch (const std::exception& e) {
+        // --- THE ERROR PATH ---
+        // Every single error from the App, Part, Extractor, or Exporter ends up here.
+        std::cerr << "\n[ERROR]: " << e.what() << std::endl;
+    } catch (...) {
+        std::cerr << "\n[ERROR]: An unknown fatal error occurred." << std::endl;
     }
 
     // 5. Clean up COM
     CoUninitialize();
-
-    std::cout << "Done. Press Enter to exit." << std::endl;
+    std::cout << "\nPress Enter to exit." << std::endl;
     std::cin.get();
 
     return 0;
