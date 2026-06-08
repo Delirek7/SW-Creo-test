@@ -139,9 +139,7 @@
     </Manifest>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClInclude Include="GeometryExtractor.h" />
     <ClInclude Include="IConverterEngine.h" />
-    <ClInclude Include="ObjExporter.h" />
     <ClInclude Include="SafeArrayBuilder.h" />
     <ClInclude Include="SafeArrayWrapper.h" />
     <ClInclude Include="SolidWorksEngine.h" />
@@ -149,9 +147,7 @@
     <ClInclude Include="SwPart.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="GeometryExtractor.cpp" />
     <ClCompile Include="main.cpp" />
-    <ClCompile Include="ObjExporter.cpp" />
     <ClCompile Include="SolidWorksEngine.cpp" />
     <ClCompile Include="SwApp.cpp" />
     <ClCompile Include="SwPart.cpp" />
