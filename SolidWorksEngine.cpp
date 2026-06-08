@@ -25,7 +25,7 @@ void SolidWorksEngine::OpenPart(const std::string& filePath) {
 
     // If this fails, SwPart throws, and execution jumps straight to main's catch block.
     // No more manual cleanup needed here!
-    m_activePart = std::make_unique<SwPart>(*m_app, filePath);
+    m_activePart = std::make_unique<SwPart>(m_app->Get(), filePath);
 }
 
 void SolidWorksEngine::ConvertToObj(const std::string& outputPath) {
