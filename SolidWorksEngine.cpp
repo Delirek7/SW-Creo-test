@@ -7,31 +7,36 @@
 #include <atlbase.h> // For CComPtr
 
 SolidWorksEngine::SolidWorksEngine() {
-    // Exception propagates up to the caller
+    // Connection happens inside SwApp constructor (RAII)
     m_app = std::make_unique<SwApp>();
 }
 
 void SolidWorksEngine::OpenPart(const std::string& filePath) {
-    // 1. Extension Validation
-    // We check if the file is actually a SolidWorks Part before telling SW to open it.
+    if (!m_app) throw std::runtime_error("Engine: No SolidWorks connection.");
+
+    // 1. Extension Validation (Before we tell SolidWorks to do anything heavy)
     std::string ext = ".SLDPRT";
     if (filePath.length() < ext.length() ||
         filePath.compare(filePath.length() - ext.length(), ext.length(), ext) != 0)
     {
-        // We convert to uppercase for the check to be case-insensitive if needed, 
-        // but for now, we'll do a simple comparison.
         throw std::runtime_error("Engine: File is not a .SLDPRT part.");
     }
 
-    // If this fails, SwPart throws, and execution jumps straight to main's catch block.
-    // No more manual cleanup needed here!
-    m_activePart = std::make_unique<SwPart>(m_app->Get(), filePath);
+    // 2. The Orchestrator simply delegates the opening to the SwPart specialist.
+    // The SwPart constructor handles the actual OpenDoc6 call.
+    // If it fails, it throws, and main's catch block will handle it.
+    m_activePart = SwPartPtr(new SwPart(m_app->Get(), filePath), [this](SwPart* part) {
+        if (part) {
+            _bstr_t title = part->GetTitle();
+            this->m_app->Get()->CloseDoc(title);
+            std::cout << "Engine: Document '" << (const char*)title << "' closed automatically by Orchestrator." << std::endl;
+            delete part;
+        }
+    });
 }
 
 void SolidWorksEngine::ConvertToObj(const std::string& outputPath) {
-    if (!m_activePart) {
-        throw std::runtime_error("Engine: Cannot convert because no part is open.");
-    }
+    if (!m_activePart) throw std::runtime_error("Engine: Cannot convert because no part is open.");
 
     // --- EXTRACTION PHASE ---
     std::vector<Triangle> allTriangles;
@@ -53,20 +58,17 @@ void SolidWorksEngine::ConvertToObj(const std::string& outputPath) {
     SafeArrayWrapper<IBody2Ptr> bodies(vBodies.parray);
 
     for (long i = bodies.Lower(); i <= bodies.Upper(); i++) {
-        // GetAt(i) handles SafeArrayGetElement and requests IUnknown pointer (pUnk) internally
         IBody2Ptr swBody = bodies.GetAt(i);
-        if (!swBody) continue; // Early return to flatten nesting
+        if (!swBody) continue; // Early exit (Continue) to flatten nesting levels
 
         // --- FACES ---
         variant_t vFaces = swBody->GetFaces();
         if (vFaces.vt & VT_ARRAY) {
             SafeArrayWrapper<IFace2Ptr> faces(vFaces.parray);
-
             for (long j = faces.Lower(); j <= faces.Upper(); j++) {
                 IFace2Ptr swFace = faces.GetAt(j);
                 if (!swFace) continue;
 
-                // Get Tessellation (Triangles) for the face
                 // VARIANT_TRUE means "use high-quality tessellation"
                 variant_t vTess = swFace->GetTessTriangles(VARIANT_TRUE);
                                             // ^Break up model to list of triangles
@@ -74,7 +76,7 @@ void SolidWorksEngine::ConvertToObj(const std::string& outputPath) {
 
                 float* pFloats = nullptr;
                 SafeArrayAccessData(vTess.parray, (void**)&pFloats);
-                // ^Direct memory access to array (High performance)
+                // ^Direct memory access to array (High performance - like Shared Memory)
                 long tL, tU;
                 SafeArrayGetLBound(vTess.parray, 1, &tL);
                 SafeArrayGetUBound(vTess.parray, 1, &tU);
@@ -95,7 +97,6 @@ void SolidWorksEngine::ConvertToObj(const std::string& outputPath) {
         variant_t vEdges = swBody->GetEdges();
         if (vEdges.vt & VT_ARRAY) {
             SafeArrayWrapper<IEdgePtr> edges(vEdges.parray);
-
             for (long j = edges.Lower(); j <= edges.Upper(); j++) {
                 IEdgePtr swEdge = edges.GetAt(j);
                 if (!swEdge) continue;
@@ -108,8 +109,6 @@ void SolidWorksEngine::ConvertToObj(const std::string& outputPath) {
                 swCurve->GetEndParams(startPt, endPt, &closed, &periodic);
 
                 // --- USE BUILDER FOR EDGES ---
-                // We use our new builder to pack the 3D points into COM format.
-                // VT_R8 means "Array of Doubles".
                 variant_t vStart = SafeArrayBuilder::Create(startPt, 3, VT_R8);
                 variant_t vEnd = SafeArrayBuilder::Create(endPt, 3, VT_R8);
 
@@ -125,8 +124,7 @@ void SolidWorksEngine::ConvertToObj(const std::string& outputPath) {
                     chain.push_back({pData[k], pData[k+1], pData[k+2]});
                 }
                 allEdgeChains.push_back(chain);
-                SafeArrayUnaccessData(vPoly.parray);
-                // Memory cleanup for vStart/vEnd is handled by variant_t RAII
+                SafeArrayUnaccessData(vPoly.parray); // Unlock the suitcase
             }
         }
     }
@@ -160,17 +158,14 @@ void SolidWorksEngine::ConvertToObj(const std::string& outputPath) {
             outFile << "v " << pt.x << " " << pt.y << " " << pt.z << "\n";
             vertexIndex++;
         }
-
-        outFile << "l"; // Create an edge chain by connecting vertex indices
+        outFile << "l"; // Connect the dots
         for (int i = 0; i < chain.size(); ++i) {
             outFile << " " << (startIdx + i);
         }
         outFile << "\n";
     }
 
-    outFile.close(); // Close stream
-
-    // std::endl is important to flush the RAM tank and ensure the user sees the output immediately
+    outFile.close();
     std::cout << "Engine: Successfully exported " << allTriangles.size() << " triangles and "
               << allEdgeChains.size() << " edge chains to " << outputPath << std::endl;
 }
