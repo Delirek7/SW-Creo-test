@@ -1,35 +1,27 @@
 #pragma once
-
 #include <string>
+#include <memory>
+#include <functional>
+#include "SwPart.h"
 
-// This is our "Contract" (Interface).
-// It defines WHAT the converter does, but not HOW it does it.
+// Forward declaration of SwPart so we don't need the full header here
+class SwPart;
+
+// Define our Smart Pointer type with the custom closer
+using SwPartPtr = std::unique_ptr<SwPart, std::function<void(SwPart*)>>;
+
+// This is our "Stateless" Contract.
 class IConverterEngine {
 public:
-    // Virtual destructor is REQUIRED for C++ interfaces to prevent memory leaks
     virtual ~IConverterEngine() = default;
 
-    // Pure virtual function (= 0 means "must be implemented by child class")
-    // std::string is used here, and we pass by "const reference" (&) for performance.
-    // Success is implied; failure throws an exception.
-    virtual void OpenPart(const std::string& filePath) = 0;
+    // Returns the "State" (the open part)
+    virtual SwPartPtr OpenPart(const std::string& filePath) = 0;
 
-    // Extracts faces and edges and saves them to the output path
-    virtual void ConvertToObj(const std::string& outputPath) = 0;
-    virtual void ClosePart() = 0;
+    // Operates on a provided "State"
+    virtual void ConvertToObj(SwPart& part, const std::string& outputPath) = 0;
 };
 
-// A simple structure to hold 3D point data
-struct Vector3 {
-    double x, y, z;
-};
-
-// A triangle is made of 3 points
-struct Triangle {
-    Vector3 v1, v2, v3;
-};
-
-// A simple line segment between two points
-struct LineSegment {
-    Vector3 v1, v2;
-};
+// Structures for 3D data (Triangles/Edges) remain the same
+struct Vector3 { double x, y, z; };
+struct Triangle { Vector3 v1, v2, v3; };
