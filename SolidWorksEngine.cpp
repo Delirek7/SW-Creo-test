@@ -108,18 +108,24 @@ void SolidWorksEngine::ConvertToObj(SwPart& part, const std::string& outputPath)
                 variant_t vEnd = SafeArrayBuilder::Create(endPt, 3, VT_R8);
 
                 variant_t vPoly = swCurve->GetTessPts(0.001, 0.001, vStart, vEnd);
-                if (!(vPoly.vt & VT_ARRAY)) continue;
+                if (vPoly.vt == (VT_ARRAY | VT_R8)) {
+                    // We use direct memory access for points (VT_R8 = double)
+                    double* pData = nullptr;
+                    SafeArrayAccessData(vPoly.parray, (void**)&pData);
 
-                SafeArrayWrapper<double> points(vPoly.parray);
-                double* pData = nullptr;
-                SafeArrayAccessData(vPoly.parray, (void**)&pData);
+                    long pL, pU;
+                    SafeArrayGetLBound(vPoly.parray, 1, &pL);
+                    SafeArrayGetUBound(vPoly.parray, 1, &pU);
+                    long count = pU - pL + 1;
 
-                std::vector<Vector3> chain;
-                for (long k = 0; k < points.Count(); k += 3) {
-                    chain.push_back({pData[k], pData[k+1], pData[k+2]});
+                    std::vector<Vector3> chain;
+                    for (long k = 0; k < count; k += 3) {
+                        chain.push_back({pData[k], pData[k+1], pData[k+2]});
+                    }
+                    allEdgeChains.push_back(chain);
+                    SafeArrayUnaccessData(vPoly.parray); // Unlock memory
                 }
-                allEdgeChains.push_back(chain);
-                SafeArrayUnaccessData(vPoly.parray); // Unlock memory
+
             }
         }
     }
