@@ -2,6 +2,7 @@
 #include <windows.h>
 #include <atlbase.h> // For CComPtr
 #include <type_traits> // For static_assert and type traits
+#include <vector>
 
 // This is a "Generic Template" class. 
 // It works like a blueprint that can be used for any SolidWorks object type (T).
@@ -23,14 +24,25 @@ public:
         }
     }
 
-    // Returns the total number of items in the array
+    // Returns all elements in a standard C++ vector for easy iteration
+    std::vector<T> GetAllElements() const {
+        std::vector<T> result;
+        if (!m_psa || Count() <= 0) return result;
+
+        result.reserve(Count()); // Optimization: Prevent multiple reallocations
+        for (long i = m_low; i <= m_high; i++) {
+            result.push_back(GetAt(i));
+        }
+        return result;
+    }
+
     long Count() const {
         return (m_high - m_low + 1);
     }
 
     T GetAt(long index) const {
-        // T is a Smart Pointer class. We pull the IUnknown from the array
-        // and let the Smart Pointer's constructor handle the conversion.
+        if (!m_psa) return nullptr;
+
         CComPtr<IUnknown> pUnk;
         SafeArrayGetElement(m_psa, &index, &pUnk.p);
         return T(pUnk.p);

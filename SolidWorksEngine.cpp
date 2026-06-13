@@ -4,8 +4,10 @@
 #include <iostream>
 #include <fstream>
 #include <vector>
+#include <atlbase.h> // For CComPtr
 
 SolidWorksEngine::SolidWorksEngine() {
+    // Connection happens inside SwApp constructor (RAII)
     m_app = std::make_unique<SwApp>();
 }
 
@@ -49,19 +51,18 @@ void SolidWorksEngine::ConvertToObj(SwPart& part, const std::string& outputPath)
     variant_t vBodies = swPart->GetBodies2(-1, VARIANT_FALSE);
     if (!(vBodies.vt & VT_ARRAY)) throw std::runtime_error("Engine: No bodies found.");
 
-    // --- BODIES (Using Wrapper) ---
-    SafeArrayWrapper<IBody2Ptr> bodies(vBodies.parray);
+    // --- BODIES (Using Wrapper + GetAllElements) ---
+    auto bodies = SafeArrayWrapper<IBody2Ptr>(vBodies.parray).GetAllElements();
 
-    for (long i = bodies.Lower(); i <= bodies.Upper(); i++) {
-        IBody2Ptr swBody = bodies.GetAt(i);
-        if (!swBody) continue; // Early exit (Continue) to flatten nesting levels
+    for (auto& swBody : bodies) {
+        if (!swBody) continue;
 
         // --- FACES ---
         variant_t vFaces = swBody->GetFaces();
         if (vFaces.vt & VT_ARRAY) {
-            SafeArrayWrapper<IFace2Ptr> faces(vFaces.parray);
-            for (long j = faces.Lower(); j <= faces.Upper(); j++) {
-                IFace2Ptr swFace = faces.GetAt(j);
+            auto faces = SafeArrayWrapper<IFace2Ptr>(vFaces.parray).GetAllElements();
+
+            for (auto& swFace : faces) {
                 if (!swFace) continue;
 
                 // VARIANT_TRUE means "use high-quality tessellation"
@@ -91,9 +92,9 @@ void SolidWorksEngine::ConvertToObj(SwPart& part, const std::string& outputPath)
         // --- EDGES ---
         variant_t vEdges = swBody->GetEdges();
         if (vEdges.vt & VT_ARRAY) {
-            SafeArrayWrapper<IEdgePtr> edges(vEdges.parray);
-            for (long j = edges.Lower(); j <= edges.Upper(); j++) {
-                IEdgePtr swEdge = edges.GetAt(j);
+            auto edges = SafeArrayWrapper<IEdgePtr>(vEdges.parray).GetAllElements();
+
+            for (auto& swEdge : edges) {
                 if (!swEdge) continue;
 
                 ICurvePtr swCurve = swEdge->GetCurve();
@@ -125,7 +126,6 @@ void SolidWorksEngine::ConvertToObj(SwPart& part, const std::string& outputPath)
                     allEdgeChains.push_back(chain);
                     SafeArrayUnaccessData(vPoly.parray); // Unlock memory
                 }
-
             }
         }
     }
@@ -152,7 +152,7 @@ void SolidWorksEngine::ConvertToObj(SwPart& part, const std::string& outputPath)
             vIdx++;
         }
         outFile << "l";
-        for (int i = 0; i < chain.size(); ++i) outFile << " " << (sIdx + i);
+        for (int i = 0; i < (int)chain.size(); ++i) outFile << " " << (sIdx + i);
         outFile << "\n";
     }
 
